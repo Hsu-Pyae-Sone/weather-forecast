@@ -6,7 +6,7 @@ Data: Finnish Meteorological Institute (FMI) open data, CC BY 4.0, station Helsi
 Every chart prints right in the terminal. The full explanation is in **[studyreport.md](studyreport.md)**.
 
 ```
-week2assignment/
+weather-forecast/
 ├── data/helsinki-daily-min-temperatures.csv   FMI open data (downloaded automatically if missing)
 ├── models/                           saved models (created by step 4 and 6)
 ├── common.py                         shared helpers: download, clean, features, split, metrics, charts
@@ -23,7 +23,7 @@ week2assignment/
 ## Setup (separate virtual environment for this project)
 
 ```powershell
-cd week2assignment
+cd weather-forecast
 python -m venv .venv
 .venv\Scripts\activate            # Mac/Linux: source .venv/bin/activate
 pip install -r requirements.txt
