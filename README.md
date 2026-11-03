@@ -44,3 +44,19 @@ pip install -r requirements.txt
 **Result:** test MAE **1.63 °C**, compared with 1.68 °C for the "tomorrow = today" baseline (about 3% better; RMSE about 5% better).
 
 Charts look best in a terminal at least 100 characters wide (VS Code terminal, Windows Terminal).
+
+## Key charts
+
+All 10 charts are in [`results/`](results/).
+
+**The data:** a clear yearly cycle, with warm summers and cold winters.
+
+![Stockholm's daily minimum temperature from 2000 to 2009, rising and falling every year](results/step1_explore_stockholm-daily-minimum-temperature.png)
+
+**The forecast:** the model follows the general level but smooths out sudden jumps.
+
+![Actual and predicted temperatures for the last 120 test days, September to December 2009](results/step5_evaluate_actual-vs-predicted-sep-dec-2009.png)
+
+**What the model uses:** yesterday's temperature does most of the work.
+
+![Feature importance: lag_1 is 0.809, roll_mean_7 is 0.161, and every other feature is below 0.02](results/step5_evaluate_share-of-total-error-reduction-per-feature.png)
