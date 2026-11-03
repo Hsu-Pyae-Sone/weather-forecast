@@ -1,17 +1,13 @@
 """
 Shared helpers used by every step script. Read this file once; the steps import from it.
 
-Dataset: daily MINIMUM temperature (°C) in Helsinki, Finland, 2015-2024.
-  - Source: Finnish Meteorological Institute (FMI) open data, licence CC BY 4.0
-  - Station: Helsinki Kaisaniemi (city centre), FMI station id "fmisid" 100971
+Dataset: daily MINIMUM temperature (°C) in Stockholm, Sweden, 2000-2009.
+  - Source: "Weather prediction dataset" on GitHub (Huber et al.), built from ECA&D station data
+  - Licence: CC BY 4.0 (dataset on Zenodo), MIT (GitHub repo). Free to use if you credit the source.
 Task:    predict TOMORROW's minimum temperature from the days before it (regression).
 """
 # Lets us change how text is printed to the terminal (see the reconfigure call below).
 import sys
-# Python's built-in HTTP client, used to download the data (like fetch() in JavaScript).
-import urllib.request
-# Python's built-in XML parser; ET is the usual short name. FMI's API answers in XML.
-import xml.etree.ElementTree as ET
 # Path builds file paths that work on both Windows and Mac/Linux.
 from pathlib import Path
 
@@ -29,29 +25,26 @@ sys.stdout.reconfigure(encoding="utf-8")  # so °C and the terminal charts print
 # The folder this file lives in; every other path is built from it, so scripts run from anywhere.
 ROOT = Path(__file__).parent
 # Where the downloaded data is cached, so we only download it once.
-DATA_PATH = ROOT / "data" / "helsinki-daily-min-temperatures.csv"
+DATA_PATH = ROOT / "data" / "stockholm-daily-min-temperatures.csv"
 # Where step 4 saves the trained model and where steps 5 and 6 load it from.
 MODEL_PATH = ROOT / "models" / "gb_model.joblib"
 
-# FMI's open API (no key needed). It returns XML and allows about one year per request.
-# The API's base address and the kind of request we are making.
-FMI_URL = ("https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature"
-           # Which ready-made query to run: daily weather observations.
-           "&storedquery_id=fmi::observations::weather::daily::simple"
-           # Which station (Helsinki Kaisaniemi) and which measurement (tmin = daily minimum).
-           "&fmisid=100971&parameters=tmin"
-           # The date range; {year} is a placeholder that .format() fills in for each request.
-           "&starttime={year}-01-01T00:00:00Z&endtime={year}-12-31T00:00:00Z")
-YEARS = range(2015, 2025)  # 2015 ... 2024 = 10 full years
+# The dataset's CSV file on GitHub (no key needed). It has one row per day and 165 columns.
+DATA_URL = ("https://raw.githubusercontent.com/florian-huber/weather_prediction_dataset/"
+            "main/dataset/weather_prediction_dataset.csv")
+# The one column we use: Stockholm's minimum temperature.
+TEMP_COLUMN = "STOCKHOLM_temp_min"
+# The file ends on 2010-01-01, so we stop a day earlier to keep exactly 10 full years.
+LAST_DAY = "2009-12-31"
 
 # Time-series split: we cut by DATE, never randomly (the future must stay hidden).
-#   2015-2020 -> train       (the model learns from this)
-#   2021-2022 -> validation  (we tune settings with this)
-#   2023-2024 -> test        (touched only at the very end, like real "future" days)
+#   2000-2005 -> train       (the model learns from this)
+#   2006-2007 -> validation  (we tune settings with this)
+#   2008-2009 -> test        (touched only at the very end, like real "future" days)
 # The last day of the training period.
-TRAIN_END = "2020-12-31"
+TRAIN_END = "2005-12-31"
 # The last day of the validation period; everything after it is the test set.
-VAL_END = "2022-12-31"
+VAL_END = "2007-12-31"
 
 # The input columns ("features") the model sees. The answer column is "target".
 FEATURES = ["lag_1", "lag_2", "lag_3", "lag_7", "roll_mean_7", "month", "doy_sin", "doy_cos"]
@@ -60,29 +53,22 @@ FEATURES = ["lag_1", "lag_2", "lag_3", "lag_7", "roll_mean_7", "month", "doy_sin
 # ----------------------------------------------------------------------------- data
 # Downloads the raw data. Only runs when the CSV file does not exist yet.
 def download():
-    """Fetch the data from FMI, one year per request, and save it as a simple CSV (Date, Temp)."""
-    # XML tag prefix -> full schema name. The XML search below needs this to recognise the tags.
-    ns = {"BsWfs": "http://xml.fmi.fi/schema/wfs/2.0"}
-    # Collects one (date, temperature) pair per day.
-    rows = []
-    # One request per year, because the API limits how much it returns at once.
-    for year in YEARS:
-        # Shows progress, because the download takes a few seconds.
-        print(f"Downloading {year} from FMI open data ...")
-        # Fills the year into the URL, calls the API and reads the XML reply (60-second limit).
-        xml = urllib.request.urlopen(FMI_URL.format(year=year), timeout=60).read()
-        for el in ET.fromstring(xml).iterfind(".//BsWfs:BsWfsElement", ns):  # one element = one day
-            date = el.findtext("BsWfs:Time", namespaces=ns)[:10]             # "2015-01-01T00:00:00Z"
-            rows.append((date, el.findtext("BsWfs:ParameterValue", namespaces=ns)))  # "NaN" if missing
+    """Fetch the CSV from GitHub, keep only Stockholm's column, and save it as (Date, Temp)."""
+    # Shows progress, because the file is about 3 MB.
+    print("Downloading the weather prediction dataset from GitHub ...")
+    # pandas can read a CSV straight from a URL; usecols keeps just the 2 columns we need.
+    full = pd.read_csv(DATA_URL, usecols=["DATE", TEMP_COLUMN], dtype={"DATE": str})
+    # Turns dates like "20000101" into real dates and gives the columns simple names.
+    data = pd.DataFrame({"Date": pd.to_datetime(full["DATE"], format="%Y%m%d"), "Temp": full[TEMP_COLUMN]})
     # Creates the data/ folder if it isn't there yet (exist_ok = no error if it already is).
     DATA_PATH.parent.mkdir(exist_ok=True)
-    # Turns the pairs into a table and saves it as CSV; index=False skips pandas' row numbers.
-    pd.DataFrame(rows, columns=["Date", "Temp"]).to_csv(DATA_PATH, index=False)
+    # Saves the 10 full years as CSV; index=False skips pandas' row numbers.
+    data[data["Date"] <= LAST_DAY].to_csv(DATA_PATH, index=False)
 
 
 # Gives callers the data without them caring whether it was downloaded or cached.
 def load_raw():
-    """Return the raw data table (downloaded from FMI on the first run only)."""
+    """Return the raw data table (downloaded from GitHub on the first run only)."""
     # A simple cache check: no file yet means this is the first run...
     if not DATA_PATH.exists():
         # ...so download the file once.
@@ -123,11 +109,11 @@ def make_features(s):
 # Divides the table by date, so the model is always tested on days later than it learned from.
 def split(df):
     """Chronological split -> (train, val, test) DataFrames."""
-    # Training rows: everything up to the end of 2020.
+    # Training rows: everything up to the end of 2005.
     train = df[df.index <= TRAIN_END]
-    # Validation rows: 2021 and 2022.
+    # Validation rows: 2006 and 2007.
     val = df[(df.index > TRAIN_END) & (df.index <= VAL_END)]
-    # Test rows: everything after 2022.
+    # Test rows: everything after 2007.
     test = df[df.index > VAL_END]
     # Returns all three parts so the caller can unpack them in one line.
     return train, val, test

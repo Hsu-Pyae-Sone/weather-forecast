@@ -13,7 +13,7 @@ import pandas as pd
 # The shared helpers: the feature list, the data pipeline functions and the printing tools.
 from common import FEATURES, banner, clean, load_raw, make_features, plot_lines, split
 
-s = clean(load_raw())  # step 1's cleaning: 3,652 days, no gaps
+s = clean(load_raw())  # step 1's cleaning: 3,653 days, no gaps
 
 # ----- Part A: turn past days into input columns -----
 banner("A. Sliding window: yesterday, 2 days ago, ... become the INPUT columns")
@@ -44,7 +44,7 @@ print(f"Check row {s.index[7].date()}: mean of the 7 days before = {s.iloc[0:7].
 # ----- Part C: tell the model the time of year -----
 banner("C. Calendar features: tell the model WHERE in the year we are")
 # Four sample dates, including Dec 31 and Jan 1, which are neighbours in real life.
-days = pd.to_datetime(["2017-01-01", "2017-04-01", "2017-07-01", "2017-12-31"])
+days = pd.to_datetime(["2003-01-01", "2003-04-01", "2003-07-01", "2003-12-31"])
 # Converts each date to its day number within the year (Jan 1 = 1, Dec 31 = 365).
 doy = days.day_of_year
 # Builds a table comparing the plain day number...
@@ -92,8 +92,8 @@ assert train.index.max() < val.index.min() and val.index.max() < test.index.min(
 # Prints a timeline of the split and explains why it isn't random.
 print("""
   |-------- train (learn) --------|-- validation (tune) --|---- test (final exam) ----|
-  2015                          2021                     2023                      2024
-Why not a random split? Shuffling would put 2024 days in training and 2017 days in the test,
+  2000                          2006                     2008                      2009
+Why not a random split? Shuffling would put 2009 days in training and 2002 days in the test,
 so the model would 'remember the future'. Real forecasts only ever know the past.""")
 
 # The answer column for all dates, which the chart below divides into three lines.

@@ -4,11 +4,11 @@
 |---|---|
 | **Course** | AI/ML Class — Week 2 assignment |
 | **Topic** | Classical machine learning: Gradient Boosting (decision-tree ensembles) |
-| **Problem** | Predict **tomorrow's minimum temperature in Helsinki, Finland** from past days (time-series regression) |
-| **Dataset** | Finnish Meteorological Institute (FMI) open data, Helsinki Kaisaniemi station, 2015–2024 |
+| **Problem** | Predict **tomorrow's minimum temperature in Stockholm, Sweden** from past days (time-series regression) |
+| **Dataset** | [Weather prediction dataset](https://github.com/florian-huber/weather_prediction_dataset) on GitHub (Stockholm column, 2000–2009), built from ECA&D station data |
 | **Tools** | Python 3.11, pandas, NumPy, scikit-learn, plotext (charts in the terminal) |
-| **Result** | Test MAE **2.10 °C**, compared with **2.19 °C** for the naive baseline (≈ 4% better; RMSE ≈ 7% better), R² = 0.89 |
-| **Date** | 29 Oct 2026 |
+| **Result** | Test MAE **1.63 °C**, compared with **1.68 °C** for the naive baseline (≈ 3% better; RMSE ≈ 5% better), R² = 0.89 |
+| **Date** | 3 Nov 2026 |
 
 ---
 
@@ -34,9 +34,9 @@
 ```
  ┌──────────┐   ┌──────────┐   ┌────────────────┐   ┌───────────────┐   ┌─────────────┐   ┌───────────┐
  │ 0. FETCH │──►│ 1. CLEAN │──►│ 2. FEATURES    │──►│ 3. SPLIT      │──►│ 4. TRAIN    │──►│ 5. EVAL   │
- │ FMI API  │   │ fill 1   │   │ lags, rolling  │   │ by TIME:      │   │ gradient    │   │ on test,  │
- │ → CSV    │   │ missing  │   │ mean, season   │   │ train│val│test│   │ boosting    │   │ vs        │
- │ 3,652    │   │ day      │   │ (8 columns)    │   │ 60% │20%│20% │   │ val picks   │   │ baselines │
+ │ GitHub   │   │ check:   │   │ lags, rolling  │   │ by TIME:      │   │ gradient    │   │ on test,  │
+ │ → CSV    │   │ no gaps  │   │ mean, season   │   │ train│val│test│   │ boosting    │   │ vs        │
+ │ 3,653    │   │ found    │   │ (8 columns)    │   │ 60% │20%│20% │   │ val picks   │   │ baselines │
  │ days     │   │ → 3,653  │   │ → 3,646 rows   │   │               │   │ # of trees  │   │           │
  └──────────┘   └──────────┘   └────────────────┘   └───────────────┘   └─────────────┘   └───────────┘
    common.py      step1            step2                 step2              step3, step4      step5, step6
@@ -44,7 +44,7 @@
 
 | Step | Script | Input → Output | Key idea |
 |---|---|---|---|
-| 0 | `common.download()` | FMI API → CSV | Data comes from an open API, the same way a frontend `fetch()`es JSON |
+| 0 | `common.download()` | GitHub CSV → smaller local CSV | Data comes from a public URL, the same way a frontend `fetch()`es JSON |
 | 1 | `step1_explore.py` | CSV → understanding | Look before you model: gaps, cycles, correlations |
 | 2 | `step2_features.py` | 1 column → 8-feature table, 3 splits | ML needs `X → y` rows; never let the future leak in |
 | 3 | `step3_gb_from_scratch.py` | table → our own model | Boosting = repeatedly fit a small tree to the current errors |
@@ -58,47 +58,46 @@
 
 ## 2. The dataset
 
-**Daily minimum temperature, Helsinki Kaisaniemi weather station (city centre), 2015–2024**
-- **Source:** the [Finnish Meteorological Institute (FMI) open data](https://en.ilmatieteenlaitos.fi/open-data), licence **CC BY 4.0**. It is free to use, but you must credit FMI.
-- **Station:** Helsinki Kaisaniemi, FMI station id (`fmisid`) **100971**, at 60.175° N, 24.945° E. It is one of Finland's longest-running stations, with measurements going back to the 1800s.
-- **How we get it:** `common.download()` calls FMI's public web API (no key needed) once per year. The API is a *WFS* (Web Feature Service, a standard for geographic data) and returns XML. We parse the XML with Python's built-in `xml.etree` and save a simple `Date,Temp` CSV to `data/`. It is downloaded only on the first run.
-- **Shape:** 3,652 rows × 2 columns. One row is one day; `Temp` is that day's **minimum** temperature in °C.
+**Daily minimum temperature, Stockholm, Sweden, 2000–2009**
+- **Source:** the [Weather prediction dataset](https://github.com/florian-huber/weather_prediction_dataset) on GitHub, made by Huber et al. for teaching machine learning. It covers 18 European locations and is built from [ECA&D](https://www.ecad.eu) (European Climate Assessment & Dataset) station records.
+- **Licence:** **CC BY 4.0** for the [dataset on Zenodo](https://doi.org/10.5281/zenodo.7525955) and **MIT** for the GitHub repo. It is free to use, but you must credit the source (see [References](#13-references)).
+- **How we get it:** `common.download()` reads the CSV straight from GitHub (no key needed), keeps only the date and `STOCKHOLM_temp_min` columns, and saves a simple `Date,Temp` CSV to `data/`. It is downloaded only on the first run.
+- **Shape:** the source file has 3,654 rows × 165 columns. We keep 3,653 rows × 2 columns, dropping the file's last day (2010-01-01) so we have exactly 10 full years. One row is one day; `Temp` is that day's **minimum** temperature in °C.
 
 ```
-GET https://opendata.fmi.fi/wfs?...&storedquery_id=fmi::observations::weather::daily::simple
-                                   &fmisid=100971&parameters=tmin&starttime=2015-01-01...&endtime=2015-12-31...
-  ⇒ <BsWfs:Time>2015-01-01T00:00:00Z</BsWfs:Time> <BsWfs:ParameterValue>1.9</BsWfs:ParameterValue> …
-  ⇒ CSV row:  2015-01-01,1.9
+GET https://raw.githubusercontent.com/florian-huber/weather_prediction_dataset/main/dataset/weather_prediction_dataset.csv
+  ⇒ DATE=20000101, STOCKHOLM_temp_min=-9.3, … (163 other columns we ignore)
+  ⇒ CSV row:  2000-01-01,-9.3
 ```
 
 | Statistic | Value |
 |---|---|
-| Date range | 2015-01-01 → 2024-12-31 |
-| Mean | 4.46 °C |
-| Std (typical spread around the mean) | 8.05 °C |
-| Min / Median / Max | **−23.9** / 3.9 / 22.8 °C |
-| Missing days | **1** (2018-05-31) |
+| Date range | 2000-01-01 → 2009-12-31 |
+| Mean | 5.11 °C |
+| Std (typical spread around the mean) | 7.25 °C |
+| Min / Median / Max | **−19.7** / 5.0 / 21.2 °C |
+| Missing days | **0** |
 
 **Average minimum temperature by month (°C)**
 
 | Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| −5.2 | −4.1 | −2.1 | +1.6 | +7.1 | +12.3 | **+14.7** | +14.2 | +10.3 | +5.0 | +1.3 | −2.2 |
+| −2.6 | **−3.2** | −1.6 | +2.8 | +7.4 | +11.6 | **+14.9** | +14.5 | +10.2 | +5.6 | +2.0 | −0.9 |
 
 **Why it is a good beginner dataset**
 - Only one variable, so we can focus on *time-series thinking* instead of data wrangling.
-- Very strong **seasonality** (a pattern that repeats every year): about 20 °C between the January and July averages.
-- **No clear trend** across the 10 years. Yearly averages bounce between 3.7 and 5.9 °C.
-- Real **noise**, especially in winter, when Helsinki swings between Arctic cold and mild Atlantic air. That keeps our expectations honest.
+- Very strong **seasonality** (a pattern that repeats every year): about 18 °C between the February and July averages.
+- **No clear trend** across the 10 years. Yearly averages bounce between 4.7 and 5.8 °C.
+- Real **noise**, especially in winter, when the minimum can jump by 10 °C overnight. That keeps our expectations honest.
 
 ```
- °C   Helsinki daily minimum temperature (sketch of the step-1 terminal chart)
+ °C   Stockholm daily minimum temperature (sketch of the step-1 terminal chart)
  20 ┤  ▐█▌    ▐█▌    ▐█▌    ▐█▌    ▐█▌    ▐█▌    ▐█▌    ▐█▌    ▐█▌    ▐█▌      ← summers
  10 ┤ ▐███▌  ▐███▌  ▐███▌  ▐███▌  ▐███▌  ▐███▌  ▐███▌  ▐███▌  ▐███▌  ▐███▌
   0 ┤█████████████████████████████████████████████████████████████████████
 −10 ┤▐▌    ▐█▌    ▐▌     ▐█▌    ▐▌     ▐▌     ▐█▌    ▐█▌    ▐█▌    ▐█▌        ← winters
-−24 ┤                                                         ▘  (Jan 2024 cold wave)
-    └─2015───2016───2017───2018───2019───2020───2021───2022───2023───2024
+−20 ┤        ▘  (coldest night: −19.7 °C, in 2001)
+    └─2000───2001───2002───2003───2004───2005───2006───2007───2008───2009
 ```
 
 ### Autocorrelation: does the past predict the future?
@@ -106,9 +105,9 @@ GET https://opendata.fmi.fi/wfs?...&storedquery_id=fmi::observations::weather::d
 
 | Today vs… | 1 day ago | 2 | 3 | 7 | 14 | 30 | 91 | 182 | 365 |
 |---|---|---|---|---|---|---|---|---|---|
-| correlation | **+0.94** | +0.89 | +0.86 | +0.80 | +0.76 | +0.67 | 0.00 | **−0.74** | **+0.75** |
+| correlation | **+0.95** | +0.90 | +0.88 | +0.82 | +0.77 | +0.69 | −0.01 | **−0.76** | **+0.79** |
 
-- **Yesterday is a very strong clue (0.94).** That's why we build "lag" features. It also means the simple rule "tomorrow = today" is a *tough* baseline here.
+- **Yesterday is a very strong clue (0.95).** That's why we build "lag" features. It also means the simple rule "tomorrow = today" is a *tough* baseline here.
 - Half a year ago the correlation is **negative** because it was the opposite season. One year ago it is positive again because it was the same season. So we also give the model **calendar features**.
 
 ---
@@ -116,25 +115,26 @@ GET https://opendata.fmi.fi/wfs?...&storedquery_id=fmi::observations::weather::d
 ## 3. Data processing & transformation, step by step
 
 ### Step 3.1: Clean the gaps (`common.clean`)
+This dataset has **no gaps**, so this step changes nothing here. It stays in the pipeline as a safety net, because real data usually has holes. Here is what it would do (the numbers are made up):
 ```
-raw:    ... 2018-05-30  2018-06-01 ...              (May 31 is missing)
-asfreq: ... 2018-05-30  2018-05-31=NaN  2018-06-01  (insert every calendar day)
-interp: ... 14.5        13.2            11.9         (14.5+11.9)/2 = 13.2, straight line between neighbours
+raw:    ... 05-30       06-01 ...              (May 31 is missing)
+asfreq: ... 05-30       05-31=NaN  06-01       (insert every calendar day)
+interp: ... 14.5        13.2       11.9        (14.5+11.9)/2 = 13.2, straight line between neighbours
 ```
 - `asfreq("D")` forces exactly **one row per day**. Many time-series tools assume evenly spaced steps, and a silent gap would make `lag_1` mean "2 days ago" for one row.
-- `interpolate()` fills each hole with a straight line between its neighbours. That is reasonable for 1 day out of 3,653.
-- FMI marks a broken measurement as `NaN`. Step 1 also checks for those; there were none.
+- `interpolate()` fills each hole with a straight line between its neighbours. That is reasonable for a day or two, but not for a long gap.
+- Step 1 also checks for empty (`NaN`) values; there were none. The dataset's authors already replaced invalid readings with the column's average, but Stockholm's values show no sign of this: all have exactly one decimal, which an average would be unlikely to.
 
 ### Step 3.2: The sliding window, from a series to a supervised table
 A model like gradient boosting learns from rows of **inputs (X) → answer (y)**. A time series only has one column, so we **create** the inputs from the past with `shift()`:
 
 ```
  date        temp            target(y)  lag_1  lag_2  lag_3
- 01-01        1.9     ──►       1.9      NaN    NaN    NaN
- 01-02        3.7               3.7      1.9    NaN    NaN
- 01-03        0.9               0.9      3.7    1.9    NaN
- 01-04       -2.0              -2.0      0.9    3.7    1.9   ← first complete row
- 01-05      -11.4             -11.4     -2.0    0.9    3.7   ← a cold snap arrives
+ 01-01       -9.3     ──►      -9.3      NaN    NaN    NaN
+ 01-02        0.5               0.5     -9.3    NaN    NaN
+ 01-03       -1.0              -1.0      0.5   -9.3    NaN
+ 01-04        2.5               2.5     -1.0    0.5   -9.3   ← first complete row
+ 01-05       -1.8              -1.8      2.5   -1.0    0.5
 ```
 Each row now says: *"given the last few days, today was X."* Rows with `NaN` (not enough history yet) are dropped.
 
@@ -174,14 +174,14 @@ $$\text{doy\_sin} = \sin\left(\frac{2\pi \cdot \text{doy}}{365.25}\right), \qqua
 ### Step 3.6: Train / validation / test split, by time
 ```
 |---------- train (learn) ----------|--- validation (tune) ---|---- test (final exam) ----|
-2015-01-08                 2020-12-31 2021-01-01     2022-12-31 2023-01-01       2024-12-31
+2000-01-08                 2005-12-31 2006-01-01     2007-12-31 2008-01-01       2009-12-31
           2,185 rows (60%)                  730 rows (20%)              731 rows (20%)
 ```
 - **Train:** the model learns its trees from this data.
 - **Validation:** *we* use this to make decisions, such as how many trees and which settings. The model never trains on it while we tune.
 - **Test:** locked away until the end. It plays the role of real "future" days.
 
-**Why not a random split?** In a time series, shuffling would put 2024 days into training and 2017 days into the test set. The model would then "remember the future", and the score would look better than real life. This is called **data leakage**.
+**Why not a random split?** In a time series, shuffling would put 2009 days into training and 2002 days into the test set. The model would then "remember the future", and the score would look better than real life. This is called **data leakage**.
 
 > **Software analogy:** Train/validation/test is like dev, staging, and production. Or, for a student: practice questions, a mock exam, and the final exam. If you study the final-exam questions, your grade no longer measures anything.
 
@@ -231,9 +231,9 @@ A **hyperparameter** is a setting we choose; the model doesn't learn it.
 
 | Hyperparameter | Meaning | Our value | Too small → | Too large → |
 |---|---|---|---|---|
-| `n_estimators` | number of trees (rounds) | chosen by validation (105 in step 4, 60 in step 6) | underfit | overfit |
+| `n_estimators` | number of trees (rounds) | chosen by validation (115 in step 4, 64 in step 6) | underfit | overfit |
 | `learning_rate` | step size per tree | 0.05 (step 4), 0.1 (step 6) | needs many trees | unstable, overfits fast |
-| `max_depth` | questions per tree | 3 | can't capture interactions | each tree overfits |
+| `max_depth` | questions per tree | 3 (step 4), 4 (step 6) | can't capture interactions | each tree overfits |
 | `subsample` | share of rows each tree sees | 0.8 | noisy | less regularisation |
 
 ---
@@ -352,47 +352,47 @@ Learning rate 0.1, depth 3:
 
 | trees | 1 | 5 | 10 | 25 | 50 | 100 | 200 |
 |---|---|---|---|---|---|---|---|
-| train MSE | 47.37 | 24.51 | 12.83 | 6.04 | 5.11 | 4.48 | **3.64** ↓ keeps falling |
-| validation MSE | 66.25 | 35.23 | 18.87 | 9.32 | **8.90** | 8.92 | 9.35 ↑ rising again |
+| train MSE | 46.43 | 23.43 | 11.75 | 5.12 | 4.30 | 3.79 | **3.06** ↓ keeps falling |
+| validation MSE | 45.41 | 22.65 | 11.45 | 5.46 | **5.18** | 5.22 | 5.30 ↑ rising again |
 
-Our 15-line version and scikit-learn's `GradientBoostingRegressor` give practically the same validation result: MAE 2.277 vs 2.266 °C, R² 0.881 vs 0.882. The tiny difference comes from how ties between equally good splits are broken. So the library really is doing what we wrote.
+Our 15-line version and scikit-learn's `GradientBoostingRegressor` give practically the same validation result: MAE 1.789 vs 1.789 °C, RMSE 2.303 vs 2.301 °C, R² 0.903 for both. The tiny difference comes from how ties between equally good splits are broken. So the library really is doing what we wrote.
 
 ### 6.2 Underfitting vs overfitting (step 4)
 Step 4 trains 500 trees (learning rate 0.05, depth 3, subsample 0.8) and measures the validation error after every tree. The sketch below shows the shape of the terminal chart:
 
 ```
  MSE
- 66 ┤╲
+ 50 ┤╲
     │ ╲
  20 ┤  ╲___
-    │      ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾  validation (flat ≈ 8.6, then slowly up)
-  5 ┤   ↑ ╲____
-    │ best=105 ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾╲_____________  train (keeps going down)
+    │      ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾  validation (flat ≈ 5.2, then slowly up)
+  4 ┤   ↑ ╲____
+    │ best=115 ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾╲_____________  train (keeps going down)
   3 ┤
     └───────────────────────────────────────────────── trees → 500
      underfit │ sweet spot │          overfit
 ```
-- **Lowest validation MSE: 8.631 at 105 trees.** With all 500 trees it is 9.043, which is worse. Extra trees just memorise training noise.
+- **Lowest validation MSE: 5.161 at 115 trees.** With all 500 trees it is 5.387, which is worse. Extra trees just memorise training noise.
 - This is **early stopping chosen by validation**. We don't use scikit-learn's built-in `n_iter_no_change`, because it holds out *random* rows, which would leak future days into training.
 
-### 6.3 The saved model (105 trees)
+### 6.3 The saved model (115 trees)
 
 | | MAE °C | RMSE °C | R² |
 |---|---|---|---|
-| train (seen) | 1.745 | 2.249 | 0.911 |
-| validation (unseen) | 2.220 | 2.938 | 0.890 |
+| train (seen) | 1.596 | 2.047 | 0.925 |
+| validation (unseen) | 1.774 | 2.272 | 0.906 |
 
-Train is better than validation, as expected. The gap (≈ 0.5 °C) is noticeable but not alarming: the validation R² (0.890) is still close to the training R² (0.911).
+Train is better than validation, as expected. The gap (≈ 0.2 °C) is small: the validation R² (0.906) is close to the training R² (0.925).
 
 ### 6.4 Reading the `verbose=1` training log
 ```
  Iter   Train Loss   OOB Improve   Remaining Time
-    1      52.2373        4.7488            1.88s
-   10      25.6522        6.8665            1.31s
-  100       5.1434       -0.0161            1.12s
-  500       3.2265        0.2800            0.00s
+    1      51.7967        4.5066            3.25s
+   10      23.9817        3.5959            1.30s
+  100       4.3224        0.2102            0.86s
+  500       2.6725       -0.1746            0.00s
 ```
-`Train Loss` goes down steadily, which is the model fitting the training data. `OOB Improve` is large early on and then jumps around near 0 after about 60–100 trees. That is another hint that later trees add little real knowledge. When there is **no loss left to reduce** on new data, more training stops helping.
+`Train Loss` goes down steadily, which is the model fitting the training data. `OOB Improve` is large but jumpy early on, and stays close to 0 after about 40 trees. That is another hint that later trees add little real knowledge. When there is **no loss left to reduce** on new data, more training stops helping.
 
 ---
 
@@ -407,41 +407,41 @@ With $e_i = y_i - \hat y_i$ (the error on day $i$, where $\hat y_i$ is the predi
 | **RMSE** | $\sqrt{\frac{1}{n}\sum e_i^2}$ | like MAE but punishes big misses more | °C |
 | **R²** | $1 - \frac{\sum e_i^2}{\sum (y_i - \bar y)^2}$ | share of the variation we explain (1 = perfect, 0 = no better than the average) | — |
 
-### 7.2 Results on the test set (731 unseen days, 2023–2024)
+### 7.2 Results on the test set (731 unseen days, 2008–2009)
 A score means nothing alone, so we compare it with **baselines**: simple rules with no ML.
 
 | Model | MAE °C | RMSE °C | R² |
 |---|---|---|---|
-| Baseline: always predict the training average | 7.286 | 8.647 | 0.000 |
-| Baseline: last 7-day mean | 2.840 | 3.757 | 0.811 |
-| Baseline: **tomorrow = today** ("persistence") | 2.191 | 3.046 | 0.876 |
-| **Gradient boosting (step 4)** | **2.099** | **2.828** | **0.893** |
-| Gradient boosting tuned + more data (step 6) | 2.118 | **2.804** | **0.895** |
+| Baseline: always predict the training average | 5.311 | 6.370 | 0.000 |
+| Baseline: last 7-day mean | 2.262 | 2.811 | 0.805 |
+| Baseline: **tomorrow = today** ("persistence") | 1.680 | 2.178 | 0.883 |
+| **Gradient boosting (step 4)** | **1.632** | **2.070** | **0.894** |
+| Gradient boosting tuned + more data (step 6) | **1.606** | **2.048** | **0.897** |
 
 **Interpretation**
-- The model beats every baseline: about **4% better MAE** and **7% better RMSE** than "tomorrow = today". RMSE improves more because the model mainly reduces the *big* misses, which squared errors punish most.
-- In Helsinki, yesterday's temperature is already very informative (autocorrelation 0.94), so the naive rule is strong and the margin for ML is small. In the Melbourne data used in an earlier draft of this project, the same model beat persistence by about 12%, because there yesterday was a weaker clue (0.77). **How much ML helps depends on the data, not only on the model.**
-- R² = 0.89 looks high, but most of it comes from the season, which every reasonable method gets. Always compare R² against the baseline's R² (0.876), not against 0.
+- The model beats every baseline: about **3% better MAE** and **5% better RMSE** than "tomorrow = today". RMSE improves more because the model mainly reduces the *big* misses, which squared errors punish most.
+- In Stockholm, yesterday's temperature is already very informative (autocorrelation 0.95), so the naive rule is strong and the margin for ML is small. In the Melbourne data used in an earlier draft of this project, the same model beat persistence by about 12%, because there yesterday was a weaker clue (0.77). **How much ML helps depends on the data, not only on the model.**
+- R² = 0.89 looks high, but most of it comes from the season, which every reasonable method gets. Always compare R² against the baseline's R² (0.883), not against 0.
 
 ### 7.3 Error analysis
-- **Residuals** (actual − predicted): the mean is **+0.03 °C**, so there is no systematic bias. **33%** of days are within ±1 °C, **59%** within ±2 °C, and **76%** within ±3 °C.
-- **Worst miss: 2024-01-22, off by 18.8 °C.** During the January 2024 cold wave Helsinki sat near −20 °C (−19.2 °C on Jan 21). Then a mild Atlantic front arrived overnight and the minimum jumped to −0.6 °C. The model predicted another −19 °C night, because nothing in the past temperatures warned of the front.
-- **MAE by month:** the model is worst in **winter** (Jan 3.18, Feb 2.79, Dec 2.78 °C) and best in **summer** (Jul 1.07 °C), a 3× difference. Winter nights in Finland swing hard: clear, calm nights over snow get very cold, while cloudy, windy nights stay mild. Temperature history alone can't tell those apart.
+- **Residuals** (actual − predicted): the mean is **+0.03 °C**, so there is no systematic bias. **38%** of days are within ±1 °C, **68%** within ±2 °C, and **85%** within ±3 °C.
+- **Worst miss: 2009-01-09, off by 9.6 °C.** Stockholm's minimum had stayed between −7.8 and −9.7 °C for three days (−9.7 °C on Jan 8), then jumped to +1.0 °C. The model predicted another cold night (−8.6 °C), because nothing in the past minimum temperatures warned of the jump.
+- **MAE by month:** the model is worst in **winter** (Feb 1.97, Dec 1.88, Jan 1.83 °C) and best in **summer** (Aug 1.45 °C), about a 1.4× difference. April is also high (1.82 °C). Clear, calm winter nights can get much colder than cloudy, windy ones, and temperature history alone can't tell those apart.
 
 ### 7.4 Feature importance (what the trees used)
 
 | Feature | Importance |
 |---|---|
-| `lag_1` | **0.856** |
-| `roll_mean_7` | 0.082 |
-| `lag_3` | 0.029 |
-| `doy_cos` | 0.018 |
-| `lag_2` | 0.006 |
+| `lag_1` | **0.809** |
+| `roll_mean_7` | 0.161 |
+| `doy_cos` | 0.014 |
 | `doy_sin` | 0.004 |
-| `month` | 0.004 |
-| `lag_7` | 0.002 |
+| `lag_3` | 0.004 |
+| `lag_7` | 0.004 |
+| `lag_2` | 0.003 |
+| `month` | 0.000 |
 
-Yesterday alone accounts for 86% of the error reduction. The weekly average and the season make small corrections. Caution: impurity-based importance can be misleading when features are correlated (as lags are). SHAP values are a more reliable alternative.
+Yesterday alone accounts for 81% of the error reduction. The weekly average and the season make small corrections. Caution: impurity-based importance can be misleading when features are correlated (as lags are). SHAP values are a more reliable alternative.
 
 ---
 
@@ -449,23 +449,31 @@ Yesterday alone accounts for 86% of the error reduction. The weekly average and 
 
 ### 8.1 What we tried (step 6), with every decision made on **validation**
 1. **Grid search:** 3 learning rates × 3 depths × 2 subsample values = 18 models. Each gets its best tree count from validation.
-   - Best: `learning_rate=0.1, max_depth=3, subsample=0.8, n_estimators=60`, validation MAE **2.191** (step 4's settings scored 2.220).
-   - The best and worst of the 18 were only **0.061 °C** apart, so many settings are "good enough".
-   - Trade-off visible in the table: a smaller learning rate needs many more trees (lr 0.02 → ~600 trees, lr 0.1 → ~60).
-2. **HistGradientBoostingRegressor:** scikit-learn's LightGBM-style booster. It first buckets features into ≤ 255 bins, which makes it much faster on big data. Validation MAE 2.211, about the same.
-3. **Retrain on train + validation** (2015–2022) with the best settings, giving the model two more years of *recent* data. On the test years:
-   - MAE **2.099 → 2.118** (slightly worse), RMSE 2.828 → 2.804 (slightly better).
-   - A win on validation did **not** clearly carry over to the test years. Differences of ±0.02 °C are noise.
-4. **More past-temperature features** (a scratch experiment during development): `lag_365`, a 30-day mean, and a trend (`lag_1 − lag_2`) changed test MAE by only about ±0.02 °C.
+   - Best: `learning_rate=0.1, max_depth=4, subsample=0.8, n_estimators=64`, validation MAE **1.748** (step 4's settings scored 1.774).
+   - The best and worst of the 18 were only **0.029 °C** apart, so many settings are "good enough".
+   - Trade-off visible in the table: a smaller learning rate needs many more trees (at depth 3 and subsample 0.8: lr 0.02 → 425 trees, lr 0.1 → 73).
+2. **HistGradientBoostingRegressor:** scikit-learn's LightGBM-style booster. It first buckets features into ≤ 255 bins, which makes it much faster on big data. Validation MAE 1.771, about the same.
+3. **Retrain on train + validation** (2000–2007) with the best settings, giving the model two more years of *recent* data. On the test years:
+   - MAE **1.632 → 1.606**, RMSE 2.070 → 2.048 (both slightly better).
+   - The win on validation carried over this time, but a difference of 0.026 °C on one test period is too small to prove much.
+4. **More features** (one-off experiments during development, not in the step scripts; they use step 4's settings and were not used to choose anything):
+
+| Features added to step 4's model | Validation MAE °C | Test MAE °C | Test RMSE °C |
+|---|---|---|---|
+| None (step 4) | 1.774 | 1.632 | 2.070 |
+| More past *minimum* temperatures: `lag_365`, 30-day mean, trend (`lag_1 − lag_2`) | 1.767 | 1.610 | 2.062 |
+| Yesterday's cloud cover, pressure, rain, sunshine | 1.746 | 1.556 | 2.009 |
+| Yesterday's mean and max temperature | 1.516 | 1.375 | 1.746 |
+| **All of yesterday's other Stockholm columns** (the two rows above together) | **1.455** | **1.317** | **1.698** |
 
 ### 8.2 The lesson
-Once the settings are reasonable, **the model is limited by the information in its inputs, not by its settings.** Past minimum temperatures alone can't see a warm front or a clear, freezing night coming.
+Once the settings are reasonable, **the model is limited by the information in its inputs, not by its settings.** More settings or more features built from the same column barely helped. New columns cut test MAE by about 19%, far more than any tuning did. Yesterday's mean and max temperature helped most, and yesterday's cloud cover, pressure, rain and sun also added something.
 
 ### 8.3 Improvement ideas, ranked by expected impact
 | Idea | Why | Effort |
 |---|---|---|
-| **Add new information**: cloud cover, wind, air pressure, snow depth, humidity (all available from FMI) | clear skies + snow → very cold nights; fronts show up in pressure and wind *before* temperature | medium: same API, more `parameters=` |
-| **Walk-forward validation** (`TimeSeriesSplit`) | one validation window can be lucky (we saw this in 8.1); several windows give a more trustworthy choice | low |
+| **Add new information**: Stockholm's other columns (mean and max temperature, cloud cover, pressure, rain, sunshine) | measured in 8.1: test MAE 1.63 → 1.32 °C. This file has no wind, humidity or snow data for Stockholm | low: same CSV file, more columns |
+| **Walk-forward validation** (`TimeSeriesSplit`) | one validation window can be lucky; several windows give a more trustworthy choice | low |
 | **Prediction intervals** (`loss="quantile"`, α = 0.1 and 0.9) | shows "likely −8 to −2 °C"; the range should be wider in winter | low |
 | **XGBoost / LightGBM / CatBoost** | same math, faster, more regularisation knobs | low |
 | **Multi-day forecasts** (recursive or one model per horizon) | real apps show 7 days ahead | medium |
@@ -498,10 +506,10 @@ Once the settings are reasonable, **the model is limited by the information in i
 - For time series, **foundation models** (pre-trained on huge collections of series, e.g. TimesFM, Chronos, Moirai) and **tabular foundation models** (e.g. TabPFN) are now real competitors, especially when data is small.
 
 ### 9.3 Open problems & active debates
-- **Trees can't extrapolate.** A tree predicts only values *between* those it saw in training (leaf averages). If a future winter is colder than anything in 2015–2022, or climate warming pushes temperatures above that range, the model can't predict it. Fixes include detrending, differencing, or linear-leaf trees (LightGBM `linear_tree`). This is a real risk for long-running time-series products.
+- **Trees can't extrapolate.** A tree predicts only values *between* those it saw in training (leaf averages). If a future winter is colder than anything in 2000–2007, or climate warming pushes temperatures above that range, the model can't predict it. Fixes include detrending, differencing, or linear-leaf trees (LightGBM `linear_tree`). This is a real risk for long-running time-series products.
 - **Deep learning vs GBDT on tabular data.** Studies (e.g. Grinsztajn et al., 2022) found that trees still usually win on medium-sized tables. Tabular foundation models are challenging that, and the debate is open.
-- **Uncertainty.** A good *range* matters as much as a good point, especially when errors are 3× larger in winter. Active topics include quantile boosting, NGBoost, and **conformal prediction** (prediction ranges with mathematical guarantees).
-- **Distribution shift / concept drift.** The world changes, so a model trained on 2015–2022 slowly goes stale. Questions include when to retrain and how to detect drift.
+- **Uncertainty.** A good *range* matters as much as a good point, especially when errors are larger in winter. Active topics include quantile boosting, NGBoost, and **conformal prediction** (prediction ranges with mathematical guarantees).
+- **Distribution shift / concept drift.** The world changes, so a model trained on 2000–2007 slowly goes stale. Questions include when to retrain and how to detect drift.
 - **Trustworthy explanations.** Impurity importances are biased, and SHAP is expensive and can mislead when features are correlated.
 - **Multi-step forecasting.** Recursive forecasting compounds its own errors, while direct forecasting needs many models. The best strategy is still task-dependent.
 
@@ -511,7 +519,7 @@ Once the settings are reasonable, **the model is limited by the information in i
 
 ### Software engineer
 - A trained model is just a **function**, `predict(features) → number`, saved as a file (`joblib`) and loaded behind an API, like any other dependency.
-- **Getting data from an API is part of ML.** Here: an HTTP GET, XML parsing, one request per year (FMI caps request size, so we paginate by year), and caching to a CSV so we don't call the API every run.
+- **Getting data from an API is part of ML.** Here: an HTTP GET of a CSV file, keeping only the 2 columns we need out of 165, and caching the result so we don't download it every run.
 - **Reproducibility = good engineering:** a separate `.venv`, pinned `requirements.txt`, fixed `random_state`, and data/feature code in one module (`common.py`) so that training and serving compute features **the same way**. A mismatch between training and serving ("training-serving skew") is a classic production bug.
 - **Data leakage is the ML version of a test that reads its own expected output.** It passes, and it means nothing.
 
@@ -521,9 +529,9 @@ Once the settings are reasonable, **the model is limited by the information in i
 - The lerp/easing analogy (`x += k * (target - x)`) is a good mental model for what each boosting round does.
 
 ### UI/UX designer
-- **Show uncertainty, not false precision.** "−5 °C (likely −8 to −2)" is more honest than "−5.14 °C". Make the range **wider in winter**, because the error is 3× larger in January than in July.
-- **Explain the prediction** in user language using feature importance or SHAP: "Cold again tonight, because last night was −19 °C."
-- **Design for the misses.** 24% of days are off by more than 3 °C, and a surprise like 2024-01-22 (18.8 °C off) will be noticed. Plan for trust-repair: update often, show "last updated", and flag "unsettled weather".
+- **Show uncertainty, not false precision.** "−5 °C (likely −8 to −2)" is more honest than "−5.14 °C". Make the range **wider in winter**, because the error is about 1.4× larger in February than in August.
+- **Explain the prediction** in user language using feature importance or SHAP: "Cold again tonight, because last night was −10 °C."
+- **Design for the misses.** 15% of days are off by more than 3 °C, and a surprise like 2009-01-09 (9.6 °C off) will be noticed. Plan for trust-repair: update often, show "last updated", and flag "unsettled weather".
 - **Evaluate like an A/B test.** Always compare against a baseline ("tomorrow = today"). A model that can't beat the simple rule shouldn't ship. Here it wins, but by a small margin.
 
 ---
@@ -553,8 +561,8 @@ Once the settings are reasonable, **the model is limited by the information in i
 | **Baseline** | a simple non-ML rule to compare against |
 | **Persistence forecast** | the baseline "tomorrow = today" |
 | **MAE / RMSE / R²** | error metrics (see §7.1) |
-| **WFS / API** | the web service FMI uses to share data; we request it with a URL, like `fetch()` |
-| **CC BY 4.0** | an open licence: free to use if you credit the source |
+| **Raw GitHub URL** | a direct link to a file in a GitHub repo; we request it like `fetch()` |
+| **CC BY 4.0 / MIT** | open licences: free to use if you credit the source or keep the licence notice |
 
 ---
 
@@ -577,15 +585,15 @@ Trees split on thresholds (feature ≤ value), so they only care about the order
 </details>
 
 <details><summary>5. Why use both a validation and a test set?</summary>
-Validation is used to make choices, and every choice slightly "fits" to it. We saw this in step 6: settings that won on validation were not better on test. The test set stays untouched, so it gives an unbiased final grade.
+Validation is used to make choices, and every choice slightly "fits" to it. The test set stays untouched, so it gives an unbiased final grade.
 </details>
 
-<details><summary>6. Why does ML help less in Helsinki (≈4%) than in Melbourne (≈12%)?</summary>
-In Helsinki, yesterday is a much stronger clue (autocorrelation 0.94 vs 0.77), so "tomorrow = today" is already a strong forecast. The model can only add what the baseline misses, and with past temperatures alone there isn't much left.
+<details><summary>6. Why does ML help less in Stockholm (≈3%) than in Melbourne (≈12%)?</summary>
+In Stockholm, yesterday is a much stronger clue (autocorrelation 0.95 vs 0.77), so "tomorrow = today" is already a strong forecast. The model can only add what the baseline misses, and with past temperatures alone there isn't much left.
 </details>
 
 <details><summary>7. Could this model predict a record −35 °C night?</summary>
-No. Its outputs are sums of leaf averages learned from 2015–2022 data (coldest: −23.9 °C), so it can't extrapolate beyond the range it has seen.
+No. Its outputs are sums of leaf averages learned from 2000–2007 data (coldest: −19.7 °C), so it can't extrapolate beyond the range it has seen.
 </details>
 
 ---
@@ -599,4 +607,5 @@ No. Its outputs are sums of leaf averages learned from 2015–2022 data (coldest
 - Grinsztajn, L. et al. (2022). *Why do tree-based models still outperform deep learning on tabular data?* NeurIPS.
 - Hastie, Tibshirani, Friedman. *The Elements of Statistical Learning*, ch. 10 (Boosting).
 - scikit-learn docs: `GradientBoostingRegressor`, `HistGradientBoostingRegressor`, "Time-related feature engineering".
-- **Data:** Finnish Meteorological Institute open data (CC BY 4.0), station Helsinki Kaisaniemi (fmisid 100971). https://en.ilmatieteenlaitos.fi/open-data
+- **Data:** Huber, F. et al. *Weather prediction dataset* (CC BY 4.0). https://github.com/florian-huber/weather_prediction_dataset, https://doi.org/10.5281/zenodo.7525955
+- **Original station data:** Klein Tank, A.M.G. and Coauthors (2002). *Daily dataset of 20th-century surface air temperature and precipitation series for the European Climate Assessment.* Int. J. of Climatol., 22, 1441-1453. https://www.ecad.eu

@@ -28,24 +28,24 @@ s = clean(raw)  # inserts the missing days and fills them in
 missing = s.index.difference(raw["Date"])
 # Compares the row counts, so we can see how many days the CSV lacked.
 print(f"Calendar days in range: {len(s)}   Rows in CSV: {len(raw)}   Missing: {len(missing)}")
-# Lists those missing dates as readable text like 2019-03-14.
+# Lists those missing dates as readable text like 2004-03-14.
 print("Missing dates:", [d.date().isoformat() for d in missing])
 # Counts the second kind of gap: the date is there but its temperature is empty.
 print(f"Rows present but with an empty value (NaN): {raw['Temp'].isna().sum()}")
-# Explains how clean() filled those gaps.
-print("-> Filled with the average of the day before and after (linear interpolation).")
+# Explains how clean() handles gaps, if there are any.
+print("-> Any gap would be filled with a straight line between its neighbours (linear interpolation).")
 # Proves the cleaning worked: this number should be 0.
 print(f"Empty values left after cleaning: {s.isna().sum()}")
 
 # ----- Question 3: is there a trend or a yearly cycle? -----
 banner("3. The whole series: a clear yearly cycle (summer warm, winter cold), no big trend")
 # Draws all 10 years as one line, so the yearly wave is visible.
-plot_lines({"min temp °C": s}, "Helsinki (Kaisaniemi) daily minimum temperature", "year", "°C", dates=s.index)
+plot_lines({"min temp °C": s}, "Stockholm daily minimum temperature", "year", "°C", dates=s.index)
 
 # Averages all the Januaries, all the Februaries and so on, giving 12 values.
 monthly = s.groupby(s.index.month).mean()
 # Tells the reader what to expect in the chart below.
-print("Average per month (Finland: Jan-Feb are the coldest, Jul is the warmest):")
+print("Average per month (Stockholm: Jan-Feb are the coldest, Jul is the warmest):")
 # Draws the 12 monthly averages as bars, with the month names as labels...
 plot_bars(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
           # ...the values rounded to 1 decimal, and the chart title.

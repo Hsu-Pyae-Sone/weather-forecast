@@ -1,13 +1,13 @@
 # Week 2 — Forecasting Tomorrow's Temperature with Gradient Boosting
 
 A small, beginner-friendly **time-series** project using **gradient boosting**, a classical machine learning model.
-It predicts tomorrow's minimum temperature in **Helsinki, Finland** from the days before it.
-Data: Finnish Meteorological Institute (FMI) open data, CC BY 4.0, station Helsinki Kaisaniemi.
+It predicts tomorrow's minimum temperature in **Stockholm, Sweden** from the days before it.
+Data: the [Weather prediction dataset](https://github.com/florian-huber/weather_prediction_dataset) on GitHub, built from ECA&D station data (CC BY 4.0 on Zenodo, MIT in the repo).
 Every chart prints right in the terminal. The full explanation is in **[studyreport.md](studyreport.md)**.
 
 ```
 weather-forecast/
-├── data/helsinki-daily-min-temperatures.csv   FMI open data (downloaded automatically if missing)
+├── data/stockholm-daily-min-temperatures.csv  from the GitHub dataset (downloaded automatically if missing)
 ├── models/                           saved models (created by step 4 and 6)
 ├── common.py                         shared helpers: download, clean, features, split, metrics, charts
 ├── step1_explore.py                  look at the data
@@ -40,6 +40,6 @@ pip install -r requirements.txt
 | 5 | `python step5_evaluate.py` | MAE / RMSE / R², baselines, error analysis |
 | 6 | `python step6_improve.py` | Grid search, HistGradientBoosting, retraining (~35 s) |
 
-**Result:** test MAE **2.10 °C**, compared with 2.19 °C for the "tomorrow = today" baseline (about 4% better; RMSE about 7% better).
+**Result:** test MAE **1.63 °C**, compared with 1.68 °C for the "tomorrow = today" baseline (about 3% better; RMSE about 5% better).
 
 Charts look best in a terminal at least 100 characters wide (VS Code terminal, Windows Terminal).

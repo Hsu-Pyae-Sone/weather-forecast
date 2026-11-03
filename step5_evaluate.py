@@ -1,5 +1,5 @@
 """
-STEP 5 - Final exam: evaluate ONCE on the test set (2023-2024), which no step has touched yet.
+STEP 5 - Final exam: evaluate ONCE on the test set (2008-2009), which no step has touched yet.
 
 A score means nothing alone, so we compare against "dumb" baselines.
 If a fancy model can't beat "tomorrow = today", it isn't worth shipping.
@@ -49,7 +49,7 @@ last = slice(-120, None)
 # Draws the real and predicted temperatures for those days as two lines...
 plot_lines({"actual": y_test.iloc[last], "predicted": pred.iloc[last]},
            # ...with this title and these axis labels.
-           "Actual vs predicted (Sep-Dec 2024)", "day", "°C")
+           "Actual vs predicted (Sep-Dec 2009)", "day", "°C")
 # Describes what the chart shows...
 print("The model follows the season and the general level well, but smooths out sudden")
 # ...and why: the inputs contain no warning that a sudden change is coming.

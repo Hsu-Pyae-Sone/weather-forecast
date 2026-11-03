@@ -96,7 +96,7 @@ print(f"HistGradientBoosting: best {hgb_n} trees, validation MAE {hgb_mae:.3f}")
 print(f"Tuned GradientBoosting:  best {best_params['n_estimators']} trees, validation MAE {best.val_MAE:.3f}")
 
 # ----- Part 3: train the final model and test it -----
-banner("3. Final model: best settings, retrained on train + validation (2015-2022)")
+banner("3. Final model: best settings, retrained on train + validation (2000-2007)")
 # Validation has done its job (choosing settings). Now its 2 years of RECENT data help training.
 # Joins the two periods into one larger training set.
 X_trval, y_trval = pd.concat([X_train, X_val]), pd.concat([y_train, y_val])
@@ -105,7 +105,7 @@ tuned = GradientBoostingRegressor(**best_params, random_state=42).fit(X_trval, y
 # Loads the step 4 model so the two can be compared.
 step4_model = joblib.load(MODEL_PATH)
 # Makes clear these scores were only reported, never used to choose anything.
-print("Test set 2023-2024 (reported once, no decisions were made with it):")
+print("Test set 2008-2009 (reported once, no decisions were made with it):")
 # Scores the simplest baseline...
 print_scores({"baseline: tomorrow = today": scores(y_test, test["lag_1"]),
               # ...the model from step 4...
@@ -130,9 +130,10 @@ print("INFORMATION in its features, not by its settings.")
 # ----- Part 4: ideas for going further -----
 banner("4. More ways to improve (try them as exercises!)")
 # Prints a list of next ideas; the program does nothing else after this.
-print("""- NEW information (the real win here): cloud cover, wind, humidity, air pressure. A cold
-  front shows up in pressure and wind BEFORE it shows up in temperature.
-  (More past-temperature features like lag_365 or a 30-day mean moved MAE by only ~0.02 °C.)
+print("""- NEW information (the real win here): the GitHub file has more Stockholm columns. Adding
+  yesterday's mean and max temperature, cloud cover, pressure, rain and sun cut test MAE from
+  1.63 to 1.32 °C in a one-off experiment. (More features built only from past MINIMUM
+  temperatures, like lag_365 or a 30-day mean, moved MAE by only ~0.02 °C.)
 - Walk-forward validation (sklearn TimeSeriesSplit): validate on several time windows, not one.
 - Other libraries: XGBoost, LightGBM, CatBoost - same math, faster, more regularisation options.
 - Prediction intervals: loss='quantile' (alpha=0.1 and 0.9) gives a '80% likely range'.

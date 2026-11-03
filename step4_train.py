@@ -3,7 +3,7 @@ STEP 4 - Train the real model. The VALIDATION set decides how many trees to keep
 
 Too few trees  -> underfitting (model too simple, misses the pattern)
 Too many trees -> overfitting  (model memorises training noise, gets worse on new days)
-We let the validation set (2021-22) tell us where the sweet spot is.
+We let the validation set (2006-07) tell us where the sweet spot is.
 Run:  python step4_train.py
 """
 # joblib saves a trained model to a file, so later steps can load it without retraining.
@@ -43,7 +43,7 @@ print("20% of rows that tree did NOT see ('out-of-bag') | Remaining Time = estim
 big = GradientBoostingRegressor(n_estimators=500, verbose=1, **PARAMS).fit(X_train, y_train)
 
 # ----- Part 2: find where the model stops improving -----
-banner("2. Validation curve: after every tree, how wrong are we on 2021-22?")
+banner("2. Validation curve: after every tree, how wrong are we on 2006-07?")
 # Note: sklearn's built-in early stopping (n_iter_no_change) holds out RANDOM rows, which would
 # mix future days into training. For time series we use our chronological validation set instead.
 # Training error after each tree; staged_predict gives the predictions at every stage.

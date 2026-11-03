@@ -110,7 +110,7 @@ X_train, y_train = (a.to_numpy() for a in xy(train))
 # Does the same for the validation data.
 X_val, y_val = (a.to_numpy() for a in xy(val))
 
-# Creates our model and trains it on 2015-2020.
+# Creates our model and trains it on 2000-2005.
 ours = SimpleGradientBoosting(n_trees=200, learning_rate=0.1, max_depth=3).fit(X_train, y_train)
 # The training error after 1 tree, 2 trees, ... 200 trees.
 train_curve = [np.mean((y_train - p) ** 2) for p in ours.staged_predict(X_train)]
