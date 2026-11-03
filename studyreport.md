@@ -6,7 +6,7 @@
 | **Topic** | Classical machine learning: Gradient Boosting (decision-tree ensembles) |
 | **Problem** | Predict **tomorrow's minimum temperature in Stockholm, Sweden** from past days (time-series regression) |
 | **Dataset** | [Weather prediction dataset](https://github.com/florian-huber/weather_prediction_dataset) on GitHub (Stockholm column, 2000–2009), built from ECA&D station data |
-| **Tools** | Python 3.11, pandas, NumPy, scikit-learn, plotext (charts in the terminal) |
+| **Tools** | Python 3.11, pandas, NumPy, scikit-learn, plotext (charts in the terminal), matplotlib (the same charts saved as PNGs) |
 | **Result** | Test MAE **1.63 °C**, compared with **1.68 °C** for the naive baseline (≈ 3% better; RMSE ≈ 5% better), R² = 0.89 |
 | **Date** | 3 Nov 2026 |
 

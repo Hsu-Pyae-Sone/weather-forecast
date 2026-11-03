@@ -6,11 +6,19 @@ Dataset: daily MINIMUM temperature (°C) in Stockholm, Sweden, 2000-2009.
   - Licence: CC BY 4.0 (dataset on Zenodo), MIT (GitHub repo). Free to use if you credit the source.
 Task:    predict TOMORROW's minimum temperature from the days before it (regression).
 """
+# Regular expressions, used to turn a chart's title into a safe file name.
+import re
 # Lets us change how text is printed to the terminal (see the reconfigure call below).
 import sys
 # Path builds file paths that work on both Windows and Mac/Linux.
 from pathlib import Path
 
+# matplotlib draws the same charts as PNG images.
+import matplotlib
+# "Agg" means: only write image files, never open a chart window.
+matplotlib.use("Agg")
+# The drawing tools. Named mpl because plt is already plotext (the terminal charts).
+from matplotlib import pyplot as mpl
 # NumPy: fast math on whole arrays of numbers at once.
 import numpy as np
 # pandas: tables in code. A DataFrame is a whole table; a Series is one labelled column.
@@ -28,6 +36,8 @@ ROOT = Path(__file__).parent
 DATA_PATH = ROOT / "data" / "stockholm-daily-min-temperatures.csv"
 # Where step 4 saves the trained model and where steps 5 and 6 load it from.
 MODEL_PATH = ROOT / "models" / "gb_model.joblib"
+# Where every chart is saved as a PNG image.
+RESULTS_DIR = ROOT / "results"
 
 # The dataset's CSV file on GitHub (no key needed). It has one row per day and 165 columns.
 DATA_URL = ("https://raw.githubusercontent.com/florian-huber/weather_prediction_dataset/"
@@ -166,9 +176,43 @@ def banner(text):
     print("\n" + "=" * 78 + f"\n{text}\n" + "=" * 78)
 
 
+# Line colours in a fixed order, checked to stay distinct for colour-blind readers.
+SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a"]
+# The chart background colour, also used for the thin gaps between histogram bars.
+SURFACE = "#fcfcfb"
+# Shared PNG style, like a small design system: quiet axes, so the data stands out.
+mpl.rcParams.update({
+    "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.dpi": 150,
+    "font.sans-serif": ["Segoe UI", "DejaVu Sans"], "text.color": "#0b0b0b",
+    "axes.titlelocation": "left", "axes.titlesize": 13, "axes.titlepad": 12,
+    "axes.labelcolor": "#52514e", "axes.edgecolor": "#c3c2b7", "axes.linewidth": 0.6,
+    "axes.spines.top": False, "axes.spines.right": False, "axes.axisbelow": True,
+    "grid.color": "#e1e0d9", "grid.linewidth": 0.6, "legend.frameon": False,
+    "xtick.color": "#c3c2b7", "xtick.labelcolor": "#52514e",
+    "ytick.color": "#c3c2b7", "ytick.labelcolor": "#52514e",
+    "lines.linewidth": 1.0, "lines.solid_capstyle": "round", "lines.solid_joinstyle": "round",
+})
+
+
+# Writes a finished chart to results/, named after its step and title.
+def save_png(fig, title):
+    # Turns "MAE by month (°C)" into "mae-by-month-c", which is safe as a file name.
+    name = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    # Adds the running script's name, e.g. step5_evaluate_mae-by-month-c.png.
+    path = RESULTS_DIR / f"{Path(sys.argv[0]).stem}_{name}.png"
+    # Creates the results/ folder if it isn't there yet.
+    RESULTS_DIR.mkdir(exist_ok=True)
+    # Saves the image; "tight" trims the empty margin around the chart.
+    fig.savefig(path, bbox_inches="tight")
+    # Frees the memory this chart used.
+    mpl.close(fig)
+    # Tells the reader where the image went.
+    print(f"Saved -> results/{path.name}")
+
+
 # The shared line chart helper, so every step's line charts look the same.
 def plot_lines(lines, title, xlabel="", ylabel="", dates=None):
-    """Draw line chart(s) in the terminal. lines = {"legend label": list_of_y_values}.
+    """Draw line chart(s) in the terminal and save them as a PNG. lines = {"legend label": list_of_y_values}.
     If `dates` is given, the x-axis is labelled with years instead of row numbers."""
     # plotext remembers the previous chart, so wipe it or the charts would stack up.
     plt.clear_figure()
@@ -194,10 +238,28 @@ def plot_lines(lines, title, xlabel="", ylabel="", dates=None):
     # Actually draws the chart in the terminal.
     plt.show()
 
+    # ----- The same chart as a PNG -----
+    fig, ax = mpl.subplots(figsize=(10, 4.4))
+    # Draws one line per entry, each with the next colour in the fixed order.
+    for (label, y), color in zip(lines.items(), SERIES_COLORS):
+        # Counts from 1, so "tree 1" is the first tree (dates use row positions for their ticks).
+        start = 0 if dates is not None else 1
+        ax.plot(range(start, start + len(y)), list(y), label=label, color=color)
+    # Reuses the January 1st positions from above, so the x-axis shows years here too.
+    if dates is not None:
+        ax.set_xticks(first_of_year, [str(dates[i].year) for i in first_of_year])
+    # Sets the heading and axis labels, and adds light horizontal guide lines.
+    ax.set(title=title, xlabel=xlabel, ylabel=ylabel)
+    ax.grid(axis="y")
+    # A legend only helps when there is more than one line to tell apart.
+    if len(lines) > 1:
+        ax.legend()
+    save_png(fig, title)
+
 
 # The shared bar chart helper, used to compare values such as months or features.
 def plot_bars(labels, values, title):
-    """Horizontal bar chart in the terminal."""
+    """Horizontal bar chart in the terminal, also saved as a PNG."""
     # Wipes the previous chart so it doesn't get mixed into this one.
     plt.clear_figure()
     # Uses the terminal's own background, same as plot_lines.
@@ -209,6 +271,24 @@ def plot_bars(labels, values, title):
     plt.title(title)
     # Actually draws the chart in the terminal.
     plt.show()
+
+    # ----- The same chart as a PNG -----
+    # Each bar gets the same height, so a chart with more bars is simply taller.
+    fig, ax = mpl.subplots(figsize=(10, 0.32 * len(labels) + 1))
+    bars = ax.barh([str(l) for l in labels], list(values), height=0.5, color=SERIES_COLORS[0])
+    # Puts the first label at the top, so the chart reads top-down.
+    ax.invert_yaxis()
+    # Prints each value at the end of its bar, so no x-axis is needed.
+    ax.bar_label(bars, fmt="%g", padding=4, color="#52514e")
+    # Draws the zero line that bars grow from, in either direction.
+    ax.axvline(0, color="#c3c2b7", linewidth=0.6)
+    # Leaves room for the value labels, and hides the axis lines they replace.
+    ax.margins(x=0.08)
+    ax.xaxis.set_visible(False)
+    ax.spines[["left", "bottom"]].set_visible(False)
+    ax.tick_params(axis="y", length=0)
+    ax.set_title(title)
+    save_png(fig, title)
 
 
 # The shared histogram helper. A histogram counts how many values land in each range.
@@ -225,3 +305,11 @@ def plot_hist(values, title, bins=30):
     plt.title(title)
     # Actually draws the chart in the terminal.
     plt.show()
+
+    # ----- The same chart as a PNG -----
+    fig, ax = mpl.subplots(figsize=(10, 4.4))
+    # The background-coloured edge leaves a thin gap between neighbouring bars.
+    ax.hist(list(values), bins=bins, color=SERIES_COLORS[0], edgecolor=SURFACE, linewidth=1)
+    ax.set(title=title, ylabel="number of days")
+    ax.grid(axis="y")
+    save_png(fig, title)

@@ -67,7 +67,7 @@ for lag, c in zip(lags, corr):
     # Prints one aligned line per gap.
     print(f"  today vs {lag:>3} days ago: {c:+.2f}")
 # Draws the same numbers as bars, so the pattern is easy to see.
-plot_bars([f"{l} days" for l in lags], corr, "Correlation of today with N days ago")
+plot_bars([f"{l} days" for l in lags], [round(c, 2) for c in corr], "Correlation of today with N days ago")
 # Points out the main finding; corr[0] is the 1-day gap.
 print(f"Yesterday is the strongest clue ({corr[0]:+.2f}). Half a year ago is NEGATIVE (opposite season),")
 # Connects the finding to the next step: it tells us which features to build.

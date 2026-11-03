@@ -3,12 +3,13 @@
 A small, beginner-friendly **time-series** project using **gradient boosting**, a classical machine learning model.
 It predicts tomorrow's minimum temperature in **Stockholm, Sweden** from the days before it.
 Data: the [Weather prediction dataset](https://github.com/florian-huber/weather_prediction_dataset) on GitHub, built from ECA&D station data (CC BY 4.0 on Zenodo, MIT in the repo).
-Every chart prints right in the terminal. The full explanation is in **[studyreport.md](studyreport.md)**.
+Every chart prints right in the terminal and is saved as a PNG in `results/`. The full explanation is in **[studyreport.md](studyreport.md)**.
 
 ```
 weather-forecast/
 ├── data/stockholm-daily-min-temperatures.csv  from the GitHub dataset (downloaded automatically if missing)
 ├── models/                           saved models (created by step 4 and 6)
+├── results/                          PNG charts (created by steps 1-5)
 ├── common.py                         shared helpers: download, clean, features, split, metrics, charts
 ├── step1_explore.py                  look at the data
 ├── step2_features.py                 data processing & transformation, train/val/test split
